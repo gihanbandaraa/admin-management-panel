@@ -45,19 +45,21 @@ export function AdminDashboard() {
 
     const executeAction = async () => {
         if (confirmationAction === 'approve') {
-            await approveDriver(selectedDriver.id);
+            await approveDriver(selectedDriver.user_id);
         } else if (confirmationAction === 'reject') {
-            await rejectDriver(selectedDriver.id);
+            await rejectDriver(selectedDriver.user_id);
+        } else if (confirmationAction === 'delete') {
+            await deleteDriver(selectedDriver.user_id);
         }
         setShowConfirmation(false);
     };
 
-    const approveDriver = async (driverId) => {
+    const approveDriver = async (userId) => {
         try {
             setActionType('approve');
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:3000/api/admins/verify-driver/${driverId}`, {
+            const response = await fetch(`http://localhost:3000/api/admins/verify-driver/${userId}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -82,12 +84,40 @@ export function AdminDashboard() {
         }
     };
 
-    const rejectDriver = async (driverId) => {
+    const deleteDriver = async (userId) => {
+        try {
+            setActionType('delete');
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            const response = await fetch(`http://localhost:3000/api/admins/delete-driver/${userId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete driver');
+            }
+
+            const driversData = await getDriversData();
+            setDrivers(driversData);
+            setSelectedDriver(null);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+            setActionType(null);
+        }
+    };
+
+    const rejectDriver = async (userId) => {
         try {
             setActionType('reject');
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:3000/api/admins/reject-driver/${driverId}`, {
+            const response = await fetch(`http://localhost:3000/api/admins/reject-driver/${userId}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -343,12 +373,32 @@ export function AdminDashboard() {
                                         <p className="text-sm font-medium">{selectedDriver.full_name}</p>
                                     </div>
                                     <div>
+                                        <span className="text-sm text-gray-500">Email:</span>
+                                        <p className="text-sm font-medium">{selectedDriver.email}</p>
+                                    </div>
+                                    <div>
                                         <span className="text-sm text-gray-500">Phone Number:</span>
                                         <p className="text-sm font-medium">{selectedDriver.phone_num}</p>
                                     </div>
                                     <div>
+                                        <span className="text-sm text-gray-500">Date of Birth:</span>
+                                        <p className="text-sm font-medium">
+                                            {selectedDriver.date_of_birth
+                                                ? new Date(selectedDriver.date_of_birth).toLocaleDateString()
+                                                : 'Not available'}
+                                        </p>
+                                    </div>
+                                    <div>
                                         <span className="text-sm text-gray-500">Address:</span>
                                         <p className="text-sm font-medium">{selectedDriver.address}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-gray-500">Registered At:</span>
+                                        <p className="text-sm font-medium">
+                                            {selectedDriver.registered_at
+                                                ? new Date(selectedDriver.registered_at).toLocaleString()
+                                                : 'Not available'}
+                                        </p>
                                     </div>
                                     <div>
                                         <span className="text-sm text-gray-500">Current Status:</span>
@@ -451,10 +501,6 @@ export function AdminDashboard() {
                                                     {new Date(selectedDriver.created_at).toLocaleDateString()}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-sm text-gray-500">Email:</span>
-                                                <span className="text-sm font-medium">{selectedDriver.email}</span>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -514,7 +560,28 @@ export function AdminDashboard() {
                                     Close
                                 </button>
 
-                                {/* Only show action buttons for pending drivers */}
+                                {/* Delete button — always available */}
+                                <button
+                                    onClick={() => confirmAction('delete', selectedDriver.user_id)}
+                                    disabled={loading}
+                                    className={`px-4 py-2 bg-red-700 text-white rounded-md hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 flex items-center justify-center min-w-[5rem] ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    {loading && actionType === 'delete' ? (
+                                        <>
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                                                 xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                 viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor"
+                                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Deleting...
+                                        </>
+                                    ) : 'Delete Account'}
+                                </button>
+
+                                {/* Only show approve/reject buttons for pending drivers */}
                                 {canTakeAction && (
                                     <>
                                         <button
@@ -570,13 +637,19 @@ export function AdminDashboard() {
                         <div className="sm:flex sm:items-start">
                             <div
                                 className={`mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${
-                                    confirmationAction === 'approve' ? 'bg-green-100' : 'bg-red-100'
+                                    confirmationAction === 'approve' ? 'bg-green-100' : confirmationAction === 'delete' ? 'bg-red-200' : 'bg-red-100'
                                 } sm:mx-0 sm:h-10 sm:w-10`}>
                                 {confirmationAction === 'approve' ? (
                                     <svg className="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg"
                                          fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                                               d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                ) : confirmationAction === 'delete' ? (
+                                    <svg className="h-6 w-6 text-red-700" xmlns="http://www.w3.org/2000/svg"
+                                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                     </svg>
                                 ) : (
                                     <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -588,13 +661,15 @@ export function AdminDashboard() {
                             </div>
                             <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
                                 <h3 className="text-lg font-medium text-gray-900">
-                                    {confirmationAction === 'approve' ? 'Approve Driver' : 'Reject Driver'}
+                                    {confirmationAction === 'approve' ? 'Approve Driver' : confirmationAction === 'delete' ? 'Delete Account' : 'Reject Driver'}
                                 </h3>
                                 <div className="mt-2">
                                     <p className="text-sm text-gray-500">
                                         {confirmationAction === 'approve'
                                             ? `Are you sure you want to approve ${selectedDriver?.full_name}? This will grant them access to accept ride requests.`
-                                            : `Are you sure you want to reject ${selectedDriver?.full_name}? They will need to resubmit their documents.`
+                                            : confirmationAction === 'delete'
+                                                ? `Are you sure you want to permanently delete ${selectedDriver?.full_name}'s account? This cannot be undone and will remove all associated data.`
+                                                : `Are you sure you want to reject ${selectedDriver?.full_name}? They will need to resubmit their documents.`
                                         }
                                     </p>
                                 </div>
@@ -607,10 +682,12 @@ export function AdminDashboard() {
                                 className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 ${
                                     confirmationAction === 'approve'
                                         ? 'bg-[#475A99] hover:bg-[#364573] focus:ring-[#475A99]'
-                                        : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                                        : confirmationAction === 'delete'
+                                            ? 'bg-red-700 hover:bg-red-800 focus:ring-red-700'
+                                            : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
                                 } text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm`}
                             >
-                                {confirmationAction === 'approve' ? 'Approve' : 'Reject'}
+                                {confirmationAction === 'approve' ? 'Approve' : confirmationAction === 'delete' ? 'Delete' : 'Reject'}
                             </button>
                             <button
                                 type="button"
