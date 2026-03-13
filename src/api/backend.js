@@ -1,28 +1,22 @@
+const API = 'http://localhost:3000';
+
+const authHeaders = () => ({
+    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+    'Content-Type': 'application/json',
+});
+
 export const getDriversData = async () => {
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:3000/api/admins/get-drivers', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        const data = await response.json();
-        return data;
-    } catch (err) {
-        console.error(err);
-        throw err;
-    }
+    const response = await fetch(`${API}/api/admins/get-drivers`, { headers: authHeaders() });
+    if (!response.ok) throw new Error('Failed to fetch drivers');
+    return response.json();
 };
 
-    export const verifyDriver = async (driverId) => {
-        try {
-            const response = await fetch(`http://localhost:3001/drivers/verify/${driverId}`, {
-                method: 'PUT'
-            });
-            const data = await response.json();
-            return data;
-        } catch (err) {
-            console.error(err);
-        }
-    }
+export const sendTestEmail = async (recipientEmail, emailType) => {
+    const response = await fetch(`${API}/api/admins/test-email`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ recipientEmail, emailType }),
+    });
+    if (!response.ok) throw new Error('Failed to send test email');
+    return response.json();
+};
